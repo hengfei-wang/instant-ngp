@@ -63,25 +63,28 @@ def run_ffmpeg(args):
 def run_colmap(args):
 	db=args.colmap_db
 	images=args.images
+	rootdir = str(Path(str(images)).parent)
 	db_noext=str(Path(db).with_suffix(""))
+	db = os.path.join(rootdir, db)
 
 	if args.text=="text":
 		args.text=db_noext+"_text"
-	text=args.text
-	sparse=db_noext+"_sparse"
+	text=os.path.join(rootdir, args.text)
+	sparse=os.path.join(rootdir, db_noext+"_sparse")
 	print(f"running colmap with:\n\tdb={db}\n\timages={images}\n\tsparse={sparse}\n\ttext={text}")
 	if (input(f"warning! folders '{sparse}' and '{text}' will be deleted/replaced. continue? (Y/n)").lower().strip()+"y")[:1] != "y":
 		sys.exit(1)
 	if os.path.exists(db):
 		os.remove(db)
-	do_system(f"colmap feature_extractor --ImageReader.camera_model OPENCV --ImageReader.single_camera 1 --database_path {db} --image_path {images}")
-	do_system(f"colmap {args.colmap_matcher}_matcher --database_path {db}")
+	# do_system(f"colmap feature_extractor --ImageReader.camera_model OPENCV --ImageReader.single_camera 1 --database_path {db} --image_path {images}")
+	do_system(f"colmap feature_extractor --ImageReader.single_camera 1 --database_path {db} --image_path {images} --SiftExtraction.use_gpu 0 --SiftExtraction.estimate_affine_shape 1 --SiftExtraction.domain_size_pooling 1")
+	do_system(f"colmap {args.colmap_matcher}_matcher --database_path {db} --SiftMatching.guided_matching 1")
 	try:
 		shutil.rmtree(sparse)
 	except:
 		pass
 	do_system(f"mkdir {sparse}")
-	do_system(f"colmap mapper --database_path {db} --image_path {images} --output_path {sparse}")
+	do_system(f"colmap mapper --database_path {db} --image_path {images} --output_path {sparse} --Mapper.tri_ignore_two_view_tracks 0")
 	do_system(f"colmap bundle_adjuster --input_path {sparse}/0 --output_path {sparse}/0 --BundleAdjustment.refine_principal_point 1")
 	try:
 		shutil.rmtree(text)
@@ -144,11 +147,12 @@ if __name__ == "__main__":
 		run_ffmpeg(args)
 	if args.run_colmap:
 		run_colmap(args)
+	rootdir = str(Path(str(args.images)).parent)
 	AABB_SCALE=int(args.aabb_scale)
 	SKIP_EARLY=int(args.skip_early)
 	IMAGE_FOLDER=args.images
-	TEXT_FOLDER=args.text
-	OUT_PATH=args.out
+	TEXT_FOLDER=os.path.join(rootdir, args.text)
+	OUT_PATH=os.path.join(rootdir, args.out)
 	print(f"outputting to {OUT_PATH}...")
 	with open(os.path.join(TEXT_FOLDER,"cameras.txt"), "r") as f:
 		angle_x=math.pi/2
@@ -228,6 +232,7 @@ if __name__ == "__main__":
 				#name = str(PurePosixPath(Path(IMAGE_FOLDER, elems[9])))
 				# why is this requireing a relitive path while using ^
 				image_rel = os.path.relpath(IMAGE_FOLDER)
+				print(image_rel)
 				name = str(f"./{image_rel}/{elems[9]}")
 				b=sharpness(name)
 				print(name, "sharpness=",b)
@@ -245,6 +250,7 @@ if __name__ == "__main__":
 
 				up += c2w[0:3,1]
 
+				name = f'images/{elems[9]}'
 				frame={"file_path":name,"sharpness":b,"transform_matrix": c2w}
 				out["frames"].append(frame)
 	nframes = len(out["frames"])
