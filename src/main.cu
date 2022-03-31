@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
 #endif
 
 		if (gui) {
-			testbed.init_window(width_flag ? get(width_flag) : 1920, height_flag ? get(height_flag) : 1080);
+			testbed.init_window(width_flag ? get(width_flag) : 3840, height_flag ? get(height_flag) : 2160);
 		}
 
 		// Render/training loop

@@ -116,6 +116,7 @@ void Testbed::clear_training_data() {
 	m_nerf.training.dataset.rays_data.free_memory();
 }
 
+
 json Testbed::load_network_config(const fs::path& network_config_path) {
 	if (!network_config_path.empty()) {
 		m_network_config_path = network_config_path;
@@ -299,9 +300,34 @@ bool imgui_colored_button(const char *name, float hue) {
 	return rv;
 }
 
+// ImFont* AddDefaultFont(float pixel_size)
+// {
+// ImGuiIO &io = ImGui::GetIO();
+// ImFontConfig config;
+// config.SizePixels = pixel_size;
+// config.OversampleH = config.OversampleV = 0;
+// config.PixelSnapH = true;
+// ImFont *font = io.Fonts->AddFontDefault(&config);
+// return font;
+// }
+
+// ImFont *fontA;
+// ImFont *fontB;
+// ImFont *fontC;
+
+// void Initialise()
+// {
+// ImFont *fontA = AddDefaultFont(13);
+// ImFont *fontB = AddDefaultFont(64);
+// ImFont *fontC = AddDefaultFont(256);
+// }
+
 void Testbed::imgui() {
+  // Initialise();
 	m_picture_in_picture_res = 0;
 	if (int read = ImGui::Begin("Camera Path", 0, ImGuiWindowFlags_NoScrollbar)) {
+    ImGui::SetWindowFontScale(2.0f);
+    // ImGui::PushFont(fontB);
 		static char path_filename_buf[128] = "";
 		if (path_filename_buf[0] == '\0') {
 			snprintf(path_filename_buf, sizeof(path_filename_buf), "%s", get_filename_in_data_path_with_suffix(m_data_path, m_network_config_path, "_cam.json").c_str());
@@ -325,9 +351,12 @@ void Testbed::imgui() {
 				ImGui::Image((ImTextureID)(size_t)m_pip_render_texture->texture(), ImVec2(w,w*9.f/16.f));
 		}
 	}
+  // ImGui::PopFont();
 	ImGui::End();
 
 	ImGui::Begin("tiny-cuda-nn");
+  ImGui::SetWindowFontScale(2.0f);
+  // ImGui::PushFont(fontB);
 
 	size_t n_bytes = tcnn::total_n_bytes_allocated() + g_total_n_bytes_allocated;
 	ImGui::Text("Frame: %.3f ms (%.1f FPS); Mem: %s", m_gui_elapsed_ms, 1000.0f / m_gui_elapsed_ms, bytes_to_string(n_bytes).c_str());
@@ -434,8 +463,9 @@ void Testbed::imgui() {
 
 		float max_diam = (m_aabb.max-m_aabb.min).maxCoeff();
 		float render_diam = (m_render_aabb.max-m_render_aabb.min).maxCoeff();
+    float render_diam_for_xgaze = 0.35;
 		float old_render_diam = render_diam;
-		if (ImGui::SliderFloat("Crop size", &render_diam, 0.1f, max_diam, "%.3f", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat)) {
+		if (ImGui::SliderFloat("Crop size", &render_diam_for_xgaze, 0.1f, max_diam, "%.3f", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoRoundToFormat)) {
 			accum_reset = true;
 			if (old_render_diam > 0.f && render_diam > 0.f) {
 				auto center = (m_render_aabb.max + m_render_aabb.min) * 0.5f;
@@ -760,6 +790,7 @@ void Testbed::imgui() {
 		m_want_repl = true;
 	}
 
+  // ImGui::PopFont();
 	ImGui::End();
 }
 
@@ -1581,7 +1612,7 @@ void Testbed::reset_network() {
 			encoding_config["base_resolution"] = m_base_grid_resolution;
 		}
 
-		float desired_resolution = 2048.0f; // Desired resolution of the finest hashgrid level over the unit cube
+		float desired_resolution = (float)encoding_config["desired_resolution"]; // Desired resolution of the finest hashgrid level over the unit cube (original number is 2048)
 		if (m_testbed_mode == ETestbedMode::Image) {
 			desired_resolution = m_image.resolution.maxCoeff() / 2.0f;
 		} else if (m_testbed_mode == ETestbedMode::Volume) {
@@ -1598,6 +1629,7 @@ void Testbed::reset_network() {
 		tlog::info()
 			<< "GridEncoding: "
 			<< " Nmin=" << m_base_grid_resolution
+      << " Nmax=" << desired_resolution * (float)m_nerf.training.dataset.aabb_scale
 			<< " b=" << m_per_level_scale
 			<< " F=" << n_features_per_level
 			<< " T=2^" << log2_hashmap_size

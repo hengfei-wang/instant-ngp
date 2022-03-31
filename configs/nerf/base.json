@@ -24,8 +24,9 @@
 		"otype": "HashGrid",
 		"n_levels": 16,
 		"n_features_per_level": 2,
-		"log2_hashmap_size": 19,
-		"base_resolution": 16
+		"log2_hashmap_size": 20, //与4096分辨率配合刚好，小了会有哈希冲突，大了会有哦overfitting问题
+		"base_resolution": 16,
+    "desired_resolution": 4096 // 使用高分辨率得到的效果更加细腻，可能存在hash collision问题
 	},
 	"network": {
 		"otype": "FullyFusedMLP",

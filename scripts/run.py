@@ -9,8 +9,10 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 import argparse
+from ast import arg
 import os
 import commentjson as json
+import subprocess
 
 import numpy as np
 
@@ -57,9 +59,18 @@ def parse_args():
 
 	parser.add_argument("--sharpen", default=0, help="Set amount of sharpening applied to NeRF training images.")
 
+	parser.add_argument("--video", action="store_true", help="Generate video according to camera_path.json file.")
+		
 	args = parser.parse_args()
 	return args
 
+def render_video(outputdir, resolution, numframes, spp, fps, exposure=0):
+	if os.path.dirname(outputdir) != "":
+		os.makedirs(outputdir, exist_ok=True)
+	for i in tqdm(list(range(numframes)), unit="frames", desc=f"Rendering"):
+		testbed.camera_smoothing = i > 0
+		frame = testbed.render(resolution[0], resolution[1], spp, True)
+		write_image(os.path.join(outputdir, f"{i:04d}.jpg"), np.clip(frame * 2**exposure, 0.0, 1.0), quality=100)
 
 if __name__ == "__main__":
 	args = parse_args()
@@ -128,8 +139,8 @@ if __name__ == "__main__":
 
 	if args.gui:
 		# Pick a sensible GUI resolution depending on arguments.
-		sw = args.width or 1920
-		sh = args.height or 1080
+		sw = args.width or 3840
+		sh = args.height or 2160
 		while sw*sh > 1920*1080*4:
 			sw = int(sw / 2)
 			sh = int(sh / 2)
@@ -319,6 +330,25 @@ if __name__ == "__main__":
 			if os.path.dirname(outname) != "":
 				os.makedirs(os.path.dirname(outname), exist_ok=True)
 			write_image(outname + ".png", image)
+	if args.video:
+		testbed.load_camera_path(os.path.join(args.scene, 'base_cam.json'))
 
+		video_dir = os.path.join(args.scene, 'videos')
+		n_seconds = 5
+		fps = 5
+		numframes = int(n_seconds*fps)
+		resolution = [1920, 1080]
+		exposure = 0
+		spp = 8
+		
+		scene = args.scene.split('/')[-1] if args.scene.split('/')[-1]!='' else args.scene.split('/')[-2]
+		print(f'Renderred scene is {scene}')
 
-
+		os.makedirs(video_dir, exist_ok=True)
+		for i in tqdm(list(range(numframes)), unit="frames", desc=f"Rendering"):
+			testbed.camera_smoothing = i > 0
+			frame = testbed.render(resolution[0], resolution[1], spp, True, 5*float(i)/numframes, 5*float(i + 1)/numframes, fps, shutter_fraction=0.5)
+			write_image(os.path.join(video_dir, f"{i:04d}.jpg"), np.clip(frame * 2**exposure, 0.0, 1.0), quality=100)
+		p = subprocess.Popen(f'ffmpeg -i {video_dir}/%04d.jpg -r 5 {video_dir}/{scene}.mp4', shell=True)
+		p.wait()
+		# subprocess.Popen(f'rm {video_dir}/*.jpg', shell=True)
